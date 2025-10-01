@@ -1,10 +1,296 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My Awesome Site</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Loop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #000000;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 90vw;
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            background: #000;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .video-container:hover .controls {
+            opacity: 1;
+        }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 14px;
+            opacity: 0.7;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4444;
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Fullscreen styles */
+        .video-container:fullscreen {
+            background: #000;
+        }
+
+        .video-container:-webkit-full-screen {
+            background: #000;
+        }
+
+        .video-container:-moz-full-screen {
+            background: #000;
+        }
+
+        .video-container:-ms-fullscreen {
+            background: #000;
+        }
+    </style>
 </head>
 <body>
-  <h1>Hello, World!</h1>
-  <p>This site is being served from GitHub Pages but you are seeing it on my custom domain.</p>
+    <div class="video-container" id="videoContainer">
+        <div class="video-wrapper">
+            <video 
+                id="mainVideo"
+                autoplay 
+                loop 
+                muted 
+                playsinline
+                preload="auto">
+                <source src="assets/passingbell_placeholder.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                Loading video...
+            </div>
+            <div class="error-message" id="errorMessage">
+                <h3>Video Error</h3>
+                <p>Unable to load the video file. Please check if the file exists at:<br>
+                <code>assets/passingbell_placeholder.mp4</code></p>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn" id="playPauseBtn">
+                <span id="playPauseIcon">⏸</span>
+                <span id="playPauseText">Pause</span>
+            </button>
+            <button class="control-btn" id="muteBtn">
+                <span id="muteIcon">🔇</span>
+                <span id="muteText">Unmute</span>
+            </button>
+            <button class="control-btn" id="fullscreenBtn">
+                <span>⛶</span>
+                <span>Fullscreen</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('mainVideo');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playPauseIcon = document.getElementById('playPauseIcon');
+        const playPauseText = document.getElementById('playPauseText');
+        const muteBtn = document.getElementById('muteBtn');
+        const muteIcon = document.getElementById('muteIcon');
+        const muteText = document.getElementById('muteText');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const videoContainer = document.getElementById('videoContainer');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Show loading initially
+        loading.classList.add('active');
+
+        // Video event listeners
+        video.addEventListener('loadstart', () => {
+            loading.classList.add('active');
+            errorMessage.classList.remove('show');
+        });
+
+        video.addEventListener('canplay', () => {
+            loading.classList.remove('active');
+        });
+
+        video.addEventListener('error', () => {
+            loading.classList.remove('active');
+            errorMessage.classList.add('show');
+        });
+
+        // Play/Pause functionality
+        playPauseBtn.addEventListener('click', () => {
+            if (video.paused) {
+                video.play();
+                playPauseIcon.textContent = '⏸';
+                playPauseText.textContent = 'Pause';
+            } else {
+                video.pause();
+                playPauseIcon.textContent = '▶';
+                playPauseText.textContent = 'Play';
+            }
+        });
+
+        // Mute/Unmute functionality
+        muteBtn.addEventListener('click', () => {
+            video.muted = !video.muted;
+            if (video.muted) {
+                muteIcon.textContent = '🔇';
+                muteText.textContent = 'Unmute';
+            } else {
+                muteIcon.textContent = '🔊';
+                muteText.textContent = 'Mute';
+            }
+        });
+
+        // Fullscreen functionality
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                videoContainer.requestFullscreen().catch(err => {
+                    console.log(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // Update fullscreen button text
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.querySelector('span:last-child').textContent = 'Exit';
+            } else {
+                fullscreenBtn.querySelector('span:last-child').textContent = 'Fullscreen';
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    playPauseBtn.click();
+                    break;
+                case 'm':
+                case 'M':
+                    muteBtn.click();
+                    break;
+                case 'f':
+                case 'F':
+                    fullscreenBtn.click();
+                    break;
+                case 'Escape':
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    }
+                    break;
+            }
+        });
+
+        // Attempt to autoplay with sound (may be blocked by browser)
+        video.play().then(() => {
+            console.log('Video started playing successfully');
+        }).catch(error => {
+            console.log('Autoplay was prevented:', error);
+            // Video will still play muted due to muted attribute
+        });
+    </script>
 </body>
 </html>
